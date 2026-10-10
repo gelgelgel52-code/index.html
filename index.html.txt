@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pinoy Arcade Videoke Machine</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
+    body { background: #0a0a0c; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+    
+    /* Cabinet Frame */
+    .cabinet { background: linear-gradient(145deg, #2b1810, #140b07); border: 8px solid #5a311b; border-radius: 16px; box-shadow: 0 0 30px rgba(255, 140, 0, 0.3), inset 0 0 15px rgba(0, 0, 0, 0.8); width: 100%; max-width: 780px; padding: 20px; position: relative; }
+    .header-banner { background: #e63946; color: #fff; text-align: center; padding: 10px; font-weight: bold; font-size: 1.4rem; letter-spacing: 2px; border-radius: 8px; margin-bottom: 15px; text-shadow: 2px 2px 4px #000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    
+    /* Screen Section */
+    .screen-container { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 4px solid #333; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,255,255,0.2); }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; z-index: 1; pointer-events: none; }
+    #ytPlayerContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; background: #000; }
+    #ytPlayerContainer iframe { width: 100%; height: 100%; border: none; }
+
+    /* Display Panels */
+    .dashboard { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-top: 15px; }
+    .display-box { background: #000; border: 2px solid #222; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    .led-green { color: #00ff66; font-size: 1.8rem; font-weight: bold; text-shadow: 0 0 8px #00ff66; }
+    .led-red { color: #ff0055; font-size: 1.2rem; font-weight: bold; text-shadow: 0 0 8px #ff0055; }
+    .label { font-size: 0.75rem; color: #aaa; margin-bottom: 4px; text-transform: uppercase; }
+
+    /* Control Panel Matrix */
+    .controls-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .btn-key { background: linear-gradient(145deg, #3a3d40, #181a1b); color: #fff; border: 1px solid #555; padding: 12px; font-size: 1.2rem; font-weight: bold; border-radius: 6px; cursor: pointer; text-shadow: 1px 1px 2px #000; box-shadow: 0 4px 0 #111; text-align: center; }
+    .btn-key:active { transform: translateY(3px); box-shadow: 0 1px 0 #111; }
+    .btn-action { background: #f72585; color: #fff; }
+    .btn-clear { background: #d62828; color: #fff; }
+    .btn-enter { background: #38b000; color: #fff; grid-column: span 3; margin-top: 5px; }
+
+    .side-actions { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+    .btn-side { background: linear-gradient(145deg, #4361ee, #3f37c9); color: #fff; border: none; padding: 14px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 0 #1b263b; }
+    .btn-side:active { transform: translateY(3px); box-shadow: 0 1px 0 #1b263b; }
+
+    /* Modal Songbook */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; padding: 20px; }
+    .modal-content { background: #1a1a24; border: 2px solid #4cc9f0; border-radius: 10px; width: 100%; max-width: 520px; max-height: 85vh; display: flex; flex-direction: column; padding: 15px; }
+    .search-input { width: 100%; padding: 10px; background: #0a0a0c; border: 1px solid #4cc9f0; color: #fff; border-radius: 6px; margin-top: 10px; font-size: 1rem; }
+    .song-list { overflow-y: auto; margin-top: 10px; max-height: 50vh; }
+    .song-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #333; cursor: pointer; }
+    .song-item:hover { background: #2a2a3a; }
+    .song-code { color: #00ff66; font-weight: bold; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+
+  <div class="cabinet">
+    <div class="header-banner">🇵🇭 PINOY VIDEOKE MACHINE 🇵🇭</div>
+    
+    <!-- VIDEOKE SCREEN -->
+    <div class="screen-container">
+      <div id="ytPlayerContainer">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 0.9rem; text-align: center; padding: 20px;">
+          I-type ang 4-digit code (0001-2000) at pindutin ang ENTER para magsimula.
+        </div>
+      </div>
+      <canvas id="videokeCanvas"></canvas>
+    </div>
+
+    <!-- DISPLAY DASHBOARD -->
+    <div class="dashboard">
+      <div class="display-box">
+        <div class="label">Input Code / Current Song</div>
+        <div id="codeDisplay" class="led-green">----</div>
+      </div>
+      <div class="display-box">
+        <div class="label">Queue Count</div>
+        <div id="queueDisplay" class="led-red">0</div>
+      </div>
+    </div>
+
+    <!-- KEYPAD & BUTTONS -->
+    <div class="controls-panel">
+      <div class="keypad">
+        <button class="btn-key" onclick="pressNum('1')">1</button>
+        <button class="btn-key" onclick="pressNum('2')">2</button>
+        <button class="btn-key" onclick="pressNum('3')">3</button>
+        <button class="btn-key" onclick="pressNum('4')">4</button>
+        <button class="btn-key" onclick="pressNum('5')">5</button>
+        <button class="btn-key" onclick="pressNum('6')">6</button>
+        <button class="btn-key" onclick="pressNum('7')">7</button>
+        <button class="btn-key" onclick="pressNum('8')">8</button>
+        <button class="btn-key" onclick="pressNum('9')">9</button>
+        <button class="btn-key btn-clear" onclick="clearCode()">CLEAR</button>
+        <button class="btn-key" onclick="pressNum('0')">0</button>
+        <button class="btn-key btn-action" onclick="nextSong()">NEXT</button>
+        <button class="btn-key btn-enter" onclick="enterCode()">ENTER / RESERVE</button>
+      </div>
+
+      <div class="side-actions">
+        <button class="btn-side" onclick="openSongbook()">📖 SONGBOOK</button>
+        <div style="font-size: 0.75rem; color: #888; text-align: center; line-height: 1.4;">
+          2,000 OPM SONGS CATALOG<br>CODES: 0001 - 2000
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SONGBOOK MODAL -->
+  <div id="songbookModal" class="modal">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="color: #4cc9f0;">SONGBOOK (0001 - 2000 SONGS)</h3>
+        <button onclick="closeSongbook()" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">✕</button>
+      </div>
+      <input type="text" id="searchBox" class="search-input" placeholder="Search title or artist (e.g. Anak, 0001)..." oninput="filterSongs()">
+      <div id="songList" class="song-list"></div>
+    </div>
+  </div>
+
+  <script>
+    // Web Audio API para sa beeping tone ng keypad
+    let audioCtx = null;
+    function playKeySound() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+      } catch (e) {}
+    }
+
+    // Web Speech API para sa Nagsasalitang Videoke Voice Simulator
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // Itigil ang nakaraang salita para hindi magpatung-patong
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0; // Bilis ng pagsasalita
+        utterance.pitch = 0.9; // Medyo mababa para tunog arcade machine
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    // Catalog Generation mula 0001 hanggang 2000
+    const songCatalog = {};
+    const sampleArtists = [
+      "Eraserheads", "Parokya Ni Edgar", "Rivermaya", "Bamboo", "Side A", 
+      "December Avenue", "Moira Dela Torre", "Juan Karlos", "Orange And Lemons", 
+      "Kamikazee", "Calein", "I Belong to the Zoo", "Freddie Aguilar", "Imago"
+    ];
+    const sampleTitles = [
+      "Anak", "Harana", "Torete", "Narda", "Ang Huling El Bimbo", 
+      "With a Smile", "Halaga", "Kisapmata", "Pangarap Lang Kita", "Ligaya", 
+      "Minsan", "Spoliarium", "Balisong", "Elesi", "Huling Sandali", "Kung Maibabalik Ko"
+    ];
+    const fallbackYtIds = ["F3q3v3MJu0E", "5bsc_c6_Y6w", "G9AC2EMxVXw", "uJV0avAF_FU", "VwuOa2F9jk4", "9iXre8k4x4c", "8di0DYO8kj0", "OoyFoFEkzTU"];
+
+    for (let i = 1; i <= 2000; i++) {
+      let code = i.toString().padStart(4, '0');
+      let titleBase = sampleTitles[(i - 1) % sampleTitles.length];
+      let artist = sampleArtists[(i - 1) % sampleArtists.length];
+      let yt = fallbackYtIds[(i - 1) % fallbackYtIds.length];
+      
+      let songTitle = i <= 15 ? titleBase : `${titleBase} Vol. ${Math.ceil(i / sampleTitles.length)}`;
+      
+      songCatalog[code] = {
+        title: songTitle,
+        artist: artist,
+        ytId: yt
+      };
+    }
+
+    let inputCode = "";
+    let queue = [];
+    let currentSong = null;
+
+    const canvas = document.getElementById('videokeCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function pressNum(num) {
+      playKeySound();
+      speakText(num); // Babanggitin ang numerong pinindot (halimbawa: "One")
+      if (inputCode.length < 4) {
+        inputCode += num;
+        document.getElementById('codeDisplay').innerText = inputCode;
+      }
+    }
+
+    function clearCode() {
+      playKeySound();
+      speakText("Clear");
+      inputCode = "";
+      document.getElementById('codeDisplay').innerText = currentSong ? currentSong.code : "----";
+    }
+
+    function enterCode() {
+      playKeySound();
+      if (songCatalog[inputCode]) {
+        const selected = songCatalog[inputCode];
+        queue.push(inputCode);
+        document.getElementById('queueDisplay').innerText = queue.length;
+        
+        // Nagsasalita ang machine para sabihin ang code at pamagat ng kanta!
+        speakText(`Reserved. Song code ${inputCode}, ${selected.title}`);
+        
+        if (!currentSong) playNextInQueue();
+        inputCode = "";
+      } else {
+        speakText("Song not found");
+        alert("Song code not found! Pumili sa pagitan ng 0001 - 2000.");
+        clearCode();
+      }
+    }
+
+    function playNextInQueue() {
+      if (queue.length > 0) {
+        const nextCode = queue.shift();
+        document.getElementById('queueDisplay').innerText = queue.length;
+        currentSong = { ...songCatalog[nextCode], code: nextCode };
+        document.getElementById('codeDisplay').innerText = nextCode;
+        
+        const playerContainer = document.getElementById('ytPlayerContainer');
+        playerContainer.innerHTML = `<iframe src="https://www.youtube.com/embed/${currentSong.ytId}?autoplay=1&enablejsapi=1&modestbranding=1&rel=0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      } else {
+        currentSong = null;
+        document.getElementById('codeDisplay').innerText = "----";
+        document.getElementById('ytPlayerContainer').innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 0.9rem;">Wala pang naka-queue na kanta.</div>`;
+      }
+    }
+
+    function nextSong() {
+      playKeySound();
+      speakText("Next song");
+      playNextInQueue();
+    }
+
+    let step = 0;
+    function renderScreen() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!currentSong) {
+        step += 0.03;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          ctx.strokeStyle = `rgba(0, 245, 212, ${0.1 + i * 0.05})`;
+          ctx.beginPath();
+          for (let x = 0; x < canvas.width; x += 15) {
+            let y = canvas.height / 2 + Math.sin(step + x * 0.02 + i) * 15;
+            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+      }
+      requestAnimationFrame(renderScreen);
+    }
+    renderScreen();
+
+    function openSongbook() {
+      playKeySound();
+      speakText("Songbook");
+      renderSongList(Object.keys(songCatalog).slice(0, 100));
+      document.getElementById('songbookModal').style.display = 'flex';
+      document.getElementById('searchBox').value = '';
+      document.getElementById('searchBox').focus();
+    }
+
+    function closeSongbook() {
+      document.getElementById('songbookModal').style.display = 'none';
+    }
+
+    function renderSongList(codesArray) {
+      const listEl = document.getElementById('songList');
+      listEl.innerHTML = "";
+      codesArray.forEach(code => {
+        const s = songCatalog[code];
+        const item = document.createElement('div');
+        item.className = 'song-item';
+        item.innerHTML = `<div><strong>${s.title}</strong><br><small style="color:#aaa">${s.artist}</small></div><div class="song-code">${code}</div>`;
+        item.onclick = () => { inputCode = code; enterCode(); closeSongbook(); };
+        listEl.appendChild(item);
+      });
+    }
+
+    function filterSongs() {
+      const query = document.getElementById('searchBox').value.toLowerCase();
+      const matchedCodes = [];
+      
+      for (let code in songCatalog) {
+        const s = songCatalog[code];
+        if (s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || code.includes(query)) {
+          matchedCodes.push(code);
+          if (matchedCodes.length >= 150) break;
+        }
+      }
+      renderSongList(matchedCodes);
+    }
+  </script>
+</body>
+</html>
